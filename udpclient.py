@@ -12,7 +12,7 @@ s.connect(("localhost", 6020))
 buf = ""
 
 mode = sys.argv[1]
-data = int(sys.argv[2])
+data = sys.argv[2]
 
 if mode == 'freq':
 	buf = buf + chr(0)
@@ -20,8 +20,14 @@ elif mode == 'mode':
 	buf = buf + chr(1)
 elif mode == 'squelch':
   buf = buf + chr(2)
+elif mode == 'gain':
+  buf = buf + chr(3)
+  if data == 'auto':
+    data = -100
 else:
 	sys.exit(1)
+
+data = int(data)
 
 i=0
 while i < 4:

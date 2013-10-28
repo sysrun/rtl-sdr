@@ -96,6 +96,8 @@ static int *atan_lut = NULL;
 static int atan_lut_size = 131072; /* 512 KB */
 static int atan_lut_coef = 8;
 
+int nearest_gain(int target_gain);
+
 struct fm_state
 {
 	int      now_r, now_j;
@@ -719,7 +721,7 @@ static unsigned int chars_to_int(unsigned char* buf) {
 static void *socket_thread_fn(void *arg) {
 	struct fm_state *fm = arg;
 	int port = 6020;
-  int n;
+  int r, n;
   int sockfd, newsockfd, portno;
   socklen_t clilen;
   unsigned char buffer[5];
@@ -745,7 +747,7 @@ static void *socket_thread_fn(void *arg) {
 
 	fprintf (stderr, "Main socket started! :-) Tuning enabled on UDP/%d \n", port);
 
-	int new_freq, demod_type, new_squelch;
+	int new_freq, demod_type, new_squelch, new_gain;
 
 	while((n = read(sockfd,buffer,5)) != 0) {
 		if(buffer[0] == 0) {
@@ -787,6 +789,25 @@ static void *socket_thread_fn(void *arg) {
 			new_squelch = chars_to_int(buffer);
 			fm->squelch_level = new_squelch;
 			fprintf (stderr, "Changing squelch to %d \n", new_squelch);
+		}
+
+		if (buffer[0] == 3) {
+			new_gain = chars_to_int(buffer);
+			if (new_gain == AUTO_GAIN) {
+				r = rtlsdr_set_tuner_gain_mode(dev, 0);
+			} else {
+				r = rtlsdr_set_tuner_gain_mode(dev, 1);
+				new_gain = nearest_gain(new_gain);
+				r = rtlsdr_set_tuner_gain(dev, new_gain);
+			}
+
+			if (r != 0) {
+				fprintf(stderr, "WARNING: Failed to set tuner gain.\n");
+			} else if (new_gain == AUTO_GAIN) {
+				fprintf(stderr, "Tuner gain set to automatic.\n");
+			} else {
+				fprintf(stderr, "Tuner gain set to %0.2f dB.\n", new_gain/10.0);
+			}
 		}
 	}
 
@@ -860,6 +881,7 @@ int nearest_gain(int target_gain)
 		}
 	}
 	free(gains);
+
 	return close_gain;
 }
 
