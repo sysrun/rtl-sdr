@@ -2,6 +2,8 @@ rtl-sdr
 turns your Realtek RTL2832 based DVB dongle into a SDR receiver
 ======================================================================
 
+Idea & Code by olgierd (http://qi.reddit.com/user/olgierd)
+
 rtl_udp (http://qi.qi.reddit.com/r/RTLSDR/comments/1er6le/rtl_fm_tuning_without_killing_the_process/)
 
 
