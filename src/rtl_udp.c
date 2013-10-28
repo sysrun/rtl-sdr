@@ -48,6 +48,10 @@
 #include <string.h>
 #include <stdio.h>
 #include <stdlib.h>
+#include <sys/socket.h>
+#include <sys/types.h>
+#include <netinet/in.h>
+#include <arpa/inet.h>
 
 #ifndef _WIN32
 #include <unistd.h>
@@ -78,12 +82,14 @@
 #define FREQUENCIES_LIMIT		1000
 
 static pthread_t demod_thread;
+static pthread_t socket_freq;
 static pthread_cond_t data_ready;   /* shared buffer filled */
 static pthread_rwlock_t data_rw;    /* lock for shared buffer */
 static pthread_mutex_t data_mutex;  /* because conds are dumb */
 static volatile int do_exit = 0;
 static rtlsdr_dev_t *dev = NULL;
 static int lcm_post[17] = {1,1,1,3,1,5,3,7,1,9,5,11,3,13,7,15,1};
+static int freq_offset;
 static int ACTUAL_BUF_LENGTH;
 
 static int *atan_lut = NULL;
@@ -568,6 +574,7 @@ static void optimal_settings(struct fm_state *fm, int freq, int hopping)
 	fm->downsample = (1000000 / fm->sample_rate) + 1;
 	fm->freq_now = freq;
 	capture_rate = fm->downsample * fm->sample_rate;
+	freq_offset = capture_rate/4;
 	capture_freq = fm->freqs[freq] + capture_rate/4;
 	capture_freq += fm->edge * fm->sample_rate / 2;
 	fm->output_scale = (1<<15) / (128 * fm->downsample);
@@ -694,6 +701,83 @@ static void *demod_thread_fn(void *arg)
 			//rtlsdr_cancel_async(dev);
 		}
 	}
+	return 0;
+}
+
+static unsigned int chars_to_int(unsigned char* buf) {
+
+	int i;
+	unsigned int val = 0;
+
+	for(i=1; i<5; i++) {
+		val = val | ((buf[i]) << ((i-1)*8));
+	}
+
+	return val;
+}
+
+static void *socket_thread_fn(void *arg) {
+	struct fm_state *fm = arg;
+	int port = 6020;
+  int n;
+  int sockfd, newsockfd, portno;
+  socklen_t clilen;
+  unsigned char buffer[5];
+  struct sockaddr_in serv_addr, cli_addr;
+
+	sockfd = socket(AF_INET, SOCK_DGRAM, IPPROTO_UDP);
+
+  if (sockfd < 0) {
+  	perror("ERROR opening socket");
+  }
+
+	bzero((char *) &serv_addr, sizeof(serv_addr));
+
+	serv_addr.sin_family = AF_INET;
+	serv_addr.sin_addr.s_addr = INADDR_ANY;
+	serv_addr.sin_port = htons(port);
+
+	if (bind(sockfd, (struct sockaddr *) &serv_addr,  sizeof(serv_addr)) < 0) {
+		perror("ERROR on binding");
+	}
+
+	bzero(buffer,5);
+
+	fprintf (stderr, "Main socket started! :-) Tuning enabled on UDP/%d \n", port);
+
+	int new_freq, demod_type;
+
+	while((n = read(sockfd,buffer,5)) != 0) {
+		if(buffer[0] == 0) {
+			new_freq = chars_to_int(buffer);
+			rtlsdr_set_center_freq(dev, new_freq + freq_offset);
+			fprintf (stderr, "Tuning to: %d [Hz] (central freq: %d [Hz])\n", new_freq, new_freq + freq_offset);
+		}
+
+		if(buffer[0] == 1) {
+			// change demod type
+			int type = chars_to_int(buffer);
+			fprintf (stderr, "Changing demod type to: %d\n", type);
+
+			switch(type) {
+				case 0:
+      		fm->mode_demod = &fm_demod;
+      	break;
+				case 1:
+      		fm->mode_demod = &am_demod;
+      	break;
+				case 2:
+      		fm->mode_demod = &usb_demod;
+      		fm->custom_atan = 1;
+      	break;
+				case 3:
+      		fm->mode_demod = &lsb_demod;
+      	break;
+      }
+		}
+	}
+
+	close(sockfd);
 	return 0;
 }
 
@@ -1019,6 +1103,7 @@ int main(int argc, char **argv)
 		fprintf(stderr, "WARNING: Failed to reset buffers.\n");}
 
 	pthread_create(&demod_thread, NULL, demod_thread_fn, (void *)(&fm));
+  pthread_create(&socket_freq, NULL, socket_thread_fn, (void *)(&fm));
 	/*rtlsdr_read_async(dev, rtlsdr_callback, (void *)(&fm),
 			      DEFAULT_ASYNC_BUF_NUMBER,
 			      ACTUAL_BUF_LENGTH);*/
