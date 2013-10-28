@@ -757,21 +757,27 @@ static void *socket_thread_fn(void *arg) {
 		if(buffer[0] == 1) {
 			// change demod type
 			int type = chars_to_int(buffer);
-			fprintf (stderr, "Changing demod type to: %d\n", type);
 
 			switch(type) {
 				case 0:
+					fprintf (stderr, "Changing demod type to FM\n");
       		fm->mode_demod = &fm_demod;
       	break;
 				case 1:
+					fprintf (stderr, "Changing demod type to AM\n");
       		fm->mode_demod = &am_demod;
       	break;
 				case 2:
+					fprintf (stderr, "Changing demod type to USB\n");
       		fm->mode_demod = &usb_demod;
       		fm->custom_atan = 1;
       	break;
 				case 3:
+					fprintf (stderr, "Changing demod type to LSB\n");
       		fm->mode_demod = &lsb_demod;
+      	break;
+				default:
+					fprintf (stderr, "Unknown demod type %d\n", type);
       	break;
       }
 		}
