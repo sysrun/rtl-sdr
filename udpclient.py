@@ -24,6 +24,12 @@ elif mode == 'gain':
   buf = buf + chr(3)
   if data == 'auto':
     data = -100
+elif mode == 'agc':
+  buf = buf + chr(8)
+  if data == 'on':
+    data = 1
+  elif data == 'off':
+    data = 0
 else:
 	sys.exit(1)
 

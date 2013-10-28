@@ -747,7 +747,7 @@ static void *socket_thread_fn(void *arg) {
 
 	fprintf (stderr, "Main socket started! :-) Tuning enabled on UDP/%d \n", port);
 
-	int new_freq, demod_type, new_squelch, new_gain;
+	int new_freq, demod_type, new_squelch, new_gain, agc_mode;
 
 	while((n = read(sockfd,buffer,5)) != 0) {
 		if(buffer[0] == 0) {
@@ -807,6 +807,16 @@ static void *socket_thread_fn(void *arg) {
 				fprintf(stderr, "Tuner gain set to automatic.\n");
 			} else {
 				fprintf(stderr, "Tuner gain set to %0.2f dB.\n", new_gain/10.0);
+			}
+		}
+
+		if (buffer[0] == 8) {
+			agc_mode = chars_to_int(buffer);
+			if (agc_mode == 0 || agc_mode == 1) {
+				fprintf(stderr, "Setting AGC to %d\n", agc_mode);
+				rtlsdr_set_agc_mode(dev, agc_mode);
+			} else {
+				fprintf(stderr, "Failed to set AGC to %d\n", agc_mode);
 			}
 		}
 	}
