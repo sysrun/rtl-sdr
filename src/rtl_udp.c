@@ -750,7 +750,8 @@ static void *socket_thread_fn(void *arg) {
 	while((n = read(sockfd,buffer,5)) != 0) {
 		if(buffer[0] == 0) {
 			new_freq = chars_to_int(buffer);
-			rtlsdr_set_center_freq(dev, new_freq + freq_offset);
+			fm->freqs[0] = new_freq;
+			optimal_settings(fm, 0, 1);
 			fprintf (stderr, "Tuning to: %d [Hz] (central freq: %d [Hz])\n", new_freq, new_freq + freq_offset);
 		}
 
