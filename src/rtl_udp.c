@@ -745,7 +745,7 @@ static void *socket_thread_fn(void *arg) {
 
 	fprintf (stderr, "Main socket started! :-) Tuning enabled on UDP/%d \n", port);
 
-	int new_freq, demod_type;
+	int new_freq, demod_type, new_squelch;
 
 	while((n = read(sockfd,buffer,5)) != 0) {
 		if(buffer[0] == 0) {
@@ -781,6 +781,12 @@ static void *socket_thread_fn(void *arg) {
 					fprintf (stderr, "Unknown demod type %d\n", type);
       	break;
       }
+		}
+
+		if (buffer[0] == 2) {
+			new_squelch = chars_to_int(buffer);
+			fm->squelch_level = new_squelch;
+			fprintf (stderr, "Changing squelch to %d \n", new_squelch);
 		}
 	}
 

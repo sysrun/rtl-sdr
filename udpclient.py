@@ -18,6 +18,8 @@ if mode == 'freq':
 	buf = buf + chr(0)
 elif mode == 'mode':
 	buf = buf + chr(1)
+elif mode == 'squelch':
+  buf = buf + chr(2)
 else:
 	sys.exit(1)
 
