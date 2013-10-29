@@ -747,7 +747,7 @@ static void *socket_thread_fn(void *arg) {
 
 	fprintf (stderr, "Main socket started! :-) Tuning enabled on UDP/%d \n", port);
 
-	int new_freq, demod_type, new_squelch, new_gain, srate_new, agc_mode;
+	int new_freq, demod_type, new_squelch, new_gain, srate_new, orate_new, agc_mode;
 
 	while((n = read(sockfd,buffer,5)) != 0) {
 		if(buffer[0] == 0) {
@@ -815,6 +815,13 @@ static void *socket_thread_fn(void *arg) {
 			srate_new = chars_to_int(buffer);
 			fprintf(stderr, "Setting samplerate to %d Hz (Current %d Hz)\n", srate_new, fm->sample_rate);
 			fm->sample_rate = (uint32_t)srate_new;
+		}
+
+		// Set outputrate
+		if (buffer[0] == 5) {
+			orate_new = chars_to_int(buffer);
+			fprintf(stderr, "Setting outputrate to %d Hz (Current %d Hz)\n", orate_new, fm->output_rate);
+			fm->output_rate = (uint32_t)orate_new;
 		}
 
 		if (buffer[0] == 8) {

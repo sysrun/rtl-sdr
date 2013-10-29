@@ -26,6 +26,8 @@ elif mode == 'gain':
     data = -100
 elif mode == 'srate':
   buf = buf + chr(4)
+elif mode == 'orate':
+  buf = buf + chr(5)
 elif mode == 'agc':
   buf = buf + chr(8)
   if data == 'on':
