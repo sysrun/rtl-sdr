@@ -1,6 +1,9 @@
 #!/usr/bin/python
 # -*- coding: utf-8 -*-
-
+#
+# * UDP modifications: Original Code by Olgierd Pilarczyk
+# * Extended by Frederik Granna <rtlsdr@granna.de>
+#
 import socket, sys
 
 if len(sys.argv) < 3:
