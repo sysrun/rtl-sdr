@@ -815,6 +815,15 @@ static void *socket_thread_fn(void *arg) {
 			srate_new = chars_to_int(buffer);
 			fprintf(stderr, "Setting samplerate to %d Hz (Current %d Hz)\n", srate_new, fm->sample_rate);
 			fm->sample_rate = (uint32_t)srate_new;
+			// Recalculate parameters
+			optimal_settings(fm, 0, 1);
+
+			int capture_rate = fm->downsample * fm->sample_rate;
+			r = rtlsdr_set_sample_rate(dev, (uint32_t)capture_rate);
+			if (r < 0) {
+				fprintf(stderr, "WARNING: Failed to set sample rate.\n");
+			}
+
 		}
 
 		// Set outputrate
