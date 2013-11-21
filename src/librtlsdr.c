@@ -195,7 +195,7 @@ int r820t_init(void *dev) {
 
 	rtlsdr_get_xtal_freq(devt, NULL, &devt->r82xx_c.xtal);
 
-	devt->r82xx_c.max_i2c_msg_len = 2;
+	devt->r82xx_c.max_i2c_msg_len = 8;
 	devt->r82xx_c.use_predetect = 0;
 	devt->r82xx_p.cfg = &devt->r82xx_c;
 
@@ -301,6 +301,7 @@ static rtlsdr_dongle_t known_devices[] = {
 	{ 0x1b80, 0xd394, "DIKOM USB-DVBT HD" },
 	{ 0x1b80, 0xd395, "Peak 102569AGPK" },
 	{ 0x1b80, 0xd39d, "SVEON STV20 DVB-T USB & FM" },
+	{ 0x1b80, 0xd3b0, "SVEON STV21 DVB-T USB & FM" },
 };
 
 #define DEFAULT_BUF_NUMBER	32
