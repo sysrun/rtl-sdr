@@ -18,6 +18,7 @@ python script **udpclient.py** for easy operation included.
   * 1 = AM
   * 2 = USB
   * 3 = LSB
+  * 4 = WBFM
 * squelch (./udpclient.py squelch 0)
   * 0 = OFF
   * n = Value
@@ -26,7 +27,13 @@ python script **udpclient.py** for easy operation included.
   * n = Gainvalue; 195 = 19.5db
 * agc (./udpclient.py agc 1)
   * 0 = OFF
-  * 1 = ON 
+  * 1 = ON
+
+* srate (./udpclient.py srate 170000)
+  * set input samplerate
+
+* orate (./udpclient.py orate 24000)
+  * set output samplerate (default 24k)
 
 
 ##Todo:

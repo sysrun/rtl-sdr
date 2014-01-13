@@ -764,6 +764,14 @@ static void *socket_thread_fn(void *arg) {
 			// change demod type
 			int type = chars_to_int(buffer);
 
+			// Reset Values
+			fm->deemph_a = 0;
+			fm->custom_atan = 0;
+			fm->deemph = 0;
+			fm->post_downsample = 1;
+			fm->output_rate = 24000;
+			fm->sample_rate = 24000;
+
 			switch(type) {
 				case 0:
 					fprintf (stderr, "Changing demod type to FM\n");
@@ -782,10 +790,38 @@ static void *socket_thread_fn(void *arg) {
 					fprintf (stderr, "Changing demod type to LSB\n");
       		fm->mode_demod = &lsb_demod;
       	break;
+ 				case 4:
+					fprintf (stderr, "Changing demod type to WBFM\n");
+					fm->mode_demod = &fm_demod;
+					fm->sample_rate = 170000;
+					fm->output_rate = 24000;
+					fm->custom_atan = 1;
+					fm->post_downsample = 4;
+					fm->deemph = 1;
+					fm->squelch_level = 0;
+
+					fm->freqs[0] += 16000;
+
+					fm->sample_rate *= fm->post_downsample;
+
+					fm->deemph_a = (int)round(1.0/((1.0-exp(-1.0/(fm->output_rate * 75e-6)))));
+
+					build_fir(fm);
+
+      	break;
 				default:
 					fprintf (stderr, "Unknown demod type %d\n", type);
       	break;
       }
+
+      optimal_settings(fm, 0, 0);
+
+			int capture_rate = fm->downsample * fm->sample_rate;
+			r = rtlsdr_set_sample_rate(dev, (uint32_t)capture_rate);
+			if (r < 0) {
+				fprintf(stderr, "WARNING: Failed to set sample rate.\n");
+			}
+
 		}
 
 		if (buffer[0] == 2) {
@@ -818,8 +854,9 @@ static void *socket_thread_fn(void *arg) {
 			srate_new = chars_to_int(buffer);
 			fprintf(stderr, "Setting samplerate to %d Hz (Current %d Hz)\n", srate_new, fm->sample_rate);
 			fm->sample_rate = (uint32_t)srate_new;
+
 			// Recalculate parameters
-			optimal_settings(fm, 0, 1);
+			optimal_settings(fm, 0, 0);
 
 			int capture_rate = fm->downsample * fm->sample_rate;
 			r = rtlsdr_set_sample_rate(dev, (uint32_t)capture_rate);
@@ -834,6 +871,10 @@ static void *socket_thread_fn(void *arg) {
 			orate_new = chars_to_int(buffer);
 			fprintf(stderr, "Setting outputrate to %d Hz (Current %d Hz)\n", orate_new, fm->output_rate);
 			fm->output_rate = (uint32_t)orate_new;
+
+			// Recalculate parameters
+			optimal_settings(fm, 0, 0);
+
 		}
 
 		if (buffer[0] == 8) {
