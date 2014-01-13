@@ -4,7 +4,7 @@ turns your Realtek RTL2832 based DVB dongle into a SDR receiver
 
 rtl_udp is a copy of rtl_fm with a special feature: It opens a udp control port (currently fixed to 6020) which takes commands like changing the frequency or mode. No need to restart :)
 
-**[Credits to olgierd](http://qi.reddit.com/user/olgierd)**
+**[Credits & original code by Olgierd Pilarczyk](http://qi.reddit.com/user/olgierd)**
 
 ##Usage:
 

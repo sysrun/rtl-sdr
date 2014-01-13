@@ -5,6 +5,9 @@
  * Copyright (C) 2012 by Kyle Keen <keenerd@gmail.com>
  * Copyright (C) 2013 by Elias Oenal <EliasOenal@gmail.com>
  *
+ * UDP modifications: Original Code by Olgierd Pilarczyk
+ * Extended by Frederik Granna <rtlsdr@granna.de>
+ *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
  * the Free Software Foundation, either version 2 of the License, or
