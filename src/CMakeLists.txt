@@ -17,10 +17,11 @@
 # the Free Software Foundation, Inc., 51 Franklin Street,
 # Boston, MA 02110-1301, USA.
 
-########################################################################
-# Setup library
-########################################################################
-add_library(rtlsdr_shared SHARED
+MACRO(RTLSDR_APPEND_SRCS)
+    LIST(APPEND rtlsdr_srcs ${ARGV})
+ENDMACRO(RTLSDR_APPEND_SRCS)
+
+RTLSDR_APPEND_SRCS(
     librtlsdr.c
     tuner_e4k.c
     tuner_fc0012.c
@@ -29,39 +30,55 @@ add_library(rtlsdr_shared SHARED
     tuner_r82xx.c
 )
 
-target_link_libraries(rtlsdr_shared
-    ${LIBUSB_LIBRARIES}
-)
+########################################################################
+# Set up Windows DLL resource files
+########################################################################
+IF(MSVC)
+    include(${CMAKE_SOURCE_DIR}/cmake/Modules/Version.cmake)
 
+    configure_file(
+        ${CMAKE_CURRENT_SOURCE_DIR}/rtlsdr.rc.in
+        ${CMAKE_CURRENT_BINARY_DIR}/rtlsdr.rc
+    @ONLY)
+
+    RTLSDR_APPEND_SRCS(${CMAKE_CURRENT_BINARY_DIR}/rtlsdr.rc)
+ENDIF(MSVC)
+
+########################################################################
+# Setup shared library variant
+########################################################################
+add_library(rtlsdr_shared SHARED ${rtlsdr_srcs})
+target_link_libraries(rtlsdr_shared ${LIBUSB_LIBRARIES})
 set_target_properties(rtlsdr_shared PROPERTIES DEFINE_SYMBOL "rtlsdr_EXPORTS")
 set_target_properties(rtlsdr_shared PROPERTIES OUTPUT_NAME rtlsdr)
 set_target_properties(rtlsdr_shared PROPERTIES SOVERSION ${MAJOR_VERSION})
 set_target_properties(rtlsdr_shared PROPERTIES VERSION ${LIBVER})
 
-add_library(rtlsdr_static STATIC
-    librtlsdr.c
-    tuner_e4k.c
-    tuner_fc0012.c
-    tuner_fc0013.c
-    tuner_fc2580.c
-    tuner_r82xx.c
+########################################################################
+# Setup static library variant
+########################################################################
+add_library(rtlsdr_static STATIC ${rtlsdr_srcs})
+target_link_libraries(rtlsdr_static ${LIBUSB_LIBRARIES})
+set_property(TARGET rtlsdr_static APPEND PROPERTY COMPILE_DEFINITIONS "rtlsdr_STATIC" )
+if(NOT WIN32)
+# Force same library filename for static and shared variants of the library
+set_target_properties(rtlsdr_static PROPERTIES OUTPUT_NAME rtlsdr)
+endif()
+
+########################################################################
+# Setup libraries used in executables
+########################################################################
+add_library(convenience_static STATIC
+    convenience/convenience.c
 )
 
 if(WIN32)
 add_library(libgetopt_static STATIC
     getopt/getopt.c
 )
-endif()
-
-target_link_libraries(rtlsdr_static
-    ${LIBUSB_LIBRARIES}
+target_link_libraries(convenience_static
+    rtlsdr_shared
 )
-
-set_property(TARGET rtlsdr_static APPEND PROPERTY COMPILE_DEFINITIONS "rtlsdr_STATIC" )
-
-if(NOT WIN32)
-# Force same library filename for static and shared variants of the library
-set_target_properties(rtlsdr_static PROPERTIES OUTPUT_NAME rtlsdr)
 endif()
 
 ########################################################################
@@ -77,35 +94,37 @@ add_executable(rtl_adsb rtl_adsb.c)
 add_executable(rtl_power rtl_power.c)
 set(INSTALL_TARGETS rtlsdr_shared rtlsdr_static rtl_sdr rtl_tcp rtl_test rtl_fm rtl_udp rtl_eeprom rtl_adsb rtl_power)
 
-target_link_libraries(rtl_sdr rtlsdr_shared
+target_link_libraries(rtl_sdr rtlsdr_shared convenience_static
     ${LIBUSB_LIBRARIES}
     ${CMAKE_THREAD_LIBS_INIT}
 )
-target_link_libraries(rtl_tcp rtlsdr_shared
+target_link_libraries(rtl_tcp rtlsdr_shared convenience_static
     ${LIBUSB_LIBRARIES}
     ${CMAKE_THREAD_LIBS_INIT}
 )
-target_link_libraries(rtl_test rtlsdr_shared
+target_link_libraries(rtl_test rtlsdr_shared convenience_static
     ${LIBUSB_LIBRARIES}
     ${CMAKE_THREAD_LIBS_INIT}
 )
-target_link_libraries(rtl_fm rtlsdr_shared
+target_link_libraries(rtl_fm rtlsdr_shared convenience_static
     ${LIBUSB_LIBRARIES}
     ${CMAKE_THREAD_LIBS_INIT}
 )
-target_link_libraries(rtl_udp rtlsdr_shared
+
+target_link_libraries(rtl_udp rtlsdr_shared convenience_static
     ${LIBUSB_LIBRARIES}
     ${CMAKE_THREAD_LIBS_INIT}
 )
-target_link_libraries(rtl_eeprom rtlsdr_shared
+
+target_link_libraries(rtl_eeprom rtlsdr_shared convenience_static
     ${LIBUSB_LIBRARIES}
     ${CMAKE_THREAD_LIBS_INIT}
 )
-target_link_libraries(rtl_adsb rtlsdr_shared
+target_link_libraries(rtl_adsb rtlsdr_shared convenience_static
     ${LIBUSB_LIBRARIES}
     ${CMAKE_THREAD_LIBS_INIT}
 )
-target_link_libraries(rtl_power rtlsdr_shared
+target_link_libraries(rtl_power rtlsdr_shared convenience_static
     ${LIBUSB_LIBRARIES}
     ${CMAKE_THREAD_LIBS_INIT}
 )

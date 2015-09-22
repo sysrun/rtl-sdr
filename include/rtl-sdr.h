@@ -216,6 +216,15 @@ RTLSDR_API int rtlsdr_get_tuner_gains(rtlsdr_dev_t *dev, int *gains);
 RTLSDR_API int rtlsdr_set_tuner_gain(rtlsdr_dev_t *dev, int gain);
 
 /*!
+ * Set the bandwidth for the device.
+ *
+ * \param dev the device handle given by rtlsdr_open()
+ * \param bw bandwidth in Hz. Zero means automatic BW selection.
+ * \return 0 on success
+ */
+RTLSDR_API int rtlsdr_set_tuner_bandwidth(rtlsdr_dev_t *dev, uint32_t bw);
+
+/*!
  * Get actual gain the device is configured to.
  *
  * \param dev the device handle given by rtlsdr_open()
@@ -243,7 +252,17 @@ RTLSDR_API int rtlsdr_set_tuner_if_gain(rtlsdr_dev_t *dev, int stage, int gain);
  */
 RTLSDR_API int rtlsdr_set_tuner_gain_mode(rtlsdr_dev_t *dev, int manual);
 
-/* this will select the baseband filters according to the requested sample rate */
+/*!
+ * Set the sample rate for the device, also selects the baseband filters
+ * according to the requested sample rate for tuners where this is possible.
+ *
+ * \param dev the device handle given by rtlsdr_open()
+ * \param samp_rate the sample rate to be set, possible values are:
+ * 		    225001 - 300000 Hz
+ * 		    900001 - 3200000 Hz
+ * 		    sample loss is to be expected for rates > 2400000
+ * \return 0 on success, -EINVAL on invalid rate
+ */
 RTLSDR_API int rtlsdr_set_sample_rate(rtlsdr_dev_t *dev, uint32_t rate);
 
 /*!
@@ -341,9 +360,10 @@ RTLSDR_API int rtlsdr_wait_async(rtlsdr_dev_t *dev, rtlsdr_read_async_cb_t cb, v
  * \param cb callback function to return received samples
  * \param ctx user specific context to pass via the callback function
  * \param buf_num optional buffer count, buf_num * buf_len = overall buffer size
- *		  set to 0 for default buffer count (32)
+ *		  set to 0 for default buffer count (15)
  * \param buf_len optional buffer length, must be multiple of 512,
- *		  set to 0 for default buffer length (16 * 32 * 512)
+ *		  should be a multiple of 16384 (URB size), set to 0
+ *		  for default buffer length (16 * 32 * 512)
  * \return 0 on success
  */
 RTLSDR_API int rtlsdr_read_async(rtlsdr_dev_t *dev,

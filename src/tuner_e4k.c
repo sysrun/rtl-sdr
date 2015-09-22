@@ -64,11 +64,13 @@ static const uint8_t width2mask[] = {
  */
 static int e4k_reg_write(struct e4k_state *e4k, uint8_t reg, uint8_t val)
 {
+	int r;
 	uint8_t data[2];
 	data[0] = reg;
 	data[1] = val;
 
-	return rtlsdr_i2c_write_fn(e4k->rtl_dev, e4k->i2c_addr, data, 2);
+	r = rtlsdr_i2c_write_fn(e4k->rtl_dev, e4k->i2c_addr, data, 2);
+	return r == 2 ? 0 : -1;
 }
 
 /*! \brief Read a register of the tuner chip
@@ -532,8 +534,6 @@ uint32_t e4k_compute_pll_params(struct e4k_pll_params *oscp, uint32_t fosc, uint
 
 int e4k_tune_params(struct e4k_state *e4k, struct e4k_pll_params *p)
 {
-	uint8_t val;
-
 	/* program R + 3phase/2phase */
 	e4k_reg_write(e4k, E4K_REG_SYNTH7, p->r_idx);
 	/* program Z */

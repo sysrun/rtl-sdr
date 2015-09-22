@@ -1,7 +1,7 @@
 /*
  * rtl-sdr, turns your Realtek RTL2832 based DVB dongle into a SDR receiver
  * Copyright (C) 2012 by Steve Markgraf <steve@steve-m.de>
- * Copyright (C) 2012 by Hoernchen <la@tfc-server.de>
+ * Copyright (C) 2012-2013 by Hoernchen <la@tfc-server.de>
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -40,6 +40,7 @@
 #include <pthread.h>
 
 #include "rtl-sdr.h"
+#include "convenience/convenience.h"
 
 #ifdef _WIN32
 #pragma comment(lib, "ws2_32.lib")
@@ -59,7 +60,6 @@ static pthread_t tcp_worker_thread;
 static pthread_t command_thread;
 static pthread_cond_t exit_cond;
 static pthread_mutex_t exit_cond_lock;
-static volatile int dead[2] = {0, 0};
 
 static pthread_mutex_t ll_mutex;
 static pthread_cond_t cond;
@@ -78,11 +78,11 @@ typedef struct { /* structure size must be multiple of 2 bytes */
 
 static rtlsdr_dev_t *dev = NULL;
 
-int global_numq = 0;
+static int global_numq = 0;
 static struct llist *ll_buffers = 0;
-int llbuf_num=500;
+static int llbuf_num = 500;
 
-static int do_exit = 0;
+static volatile int do_exit = 0;
 
 void usage(void)
 {
@@ -92,9 +92,10 @@ void usage(void)
 		"\t[-f frequency to tune to [Hz]]\n"
 		"\t[-g gain (default: 0 for auto)]\n"
 		"\t[-s samplerate in Hz (default: 2048000 Hz)]\n"
-		"\t[-b number of buffers (default: 32, set by library)]\n"
+		"\t[-b number of buffers (default: 15, set by library)]\n"
 		"\t[-n max number of linked list buffers to keep (default: 500)]\n"
-		"\t[-d device index (default: 0)]\n");
+		"\t[-d device index (default: 0)]\n"
+		"\t[-P ppm_error (default: 0)]\n");
 	exit(1);
 }
 
@@ -135,10 +136,8 @@ sighandler(int signum)
 static void sighandler(int signum)
 {
 	fprintf(stderr, "Signal caught, exiting!\n");
-	if (!do_exit) {
-      rtlsdr_cancel_async(dev);
-      do_exit = 1;
-    }
+	rtlsdr_cancel_async(dev);
+	do_exit = 1;
 }
 #endif
 
@@ -210,7 +209,6 @@ static void *tcp_worker(void *arg)
 			pthread_mutex_unlock(&ll_mutex);
 			printf("worker cond timeout\n");
 			sighandler(0);
-			dead[0]=1;
 			pthread_exit(NULL);
 		}
 
@@ -230,23 +228,12 @@ static void *tcp_worker(void *arg)
 				r = select(s+1, NULL, &writefds, NULL, &tv);
 				if(r) {
 					bytessent = send(s,  &curelem->data[index], bytesleft, 0);
-					if (bytessent == SOCKET_ERROR) {
-                        perror("worker socket error");
-						sighandler(0);
-						dead[0]=1;
-						pthread_exit(NULL);
-					} else if (do_exit) {
-						printf("do_exit\n");
-						dead[0]=1;
-						pthread_exit(NULL);
-					} else {
-						bytesleft -= bytessent;
-						index += bytessent;
-					}
-				} else if(do_exit) {
+					bytesleft -= bytessent;
+					index += bytessent;
+				}
+				if(bytessent == SOCKET_ERROR || do_exit) {
 						printf("worker socket bye\n");
 						sighandler(0);
-						dead[0]=1;
 						pthread_exit(NULL);
 				}
 			}
@@ -289,7 +276,7 @@ struct command{
 #endif
 static void *command_worker(void *arg)
 {
-	int left, received;
+	int left, received = 0;
 	fd_set readfds;
 	struct command cmd={0, 0};
 	struct timeval tv= {1, 0};
@@ -306,22 +293,11 @@ static void *command_worker(void *arg)
 			r = select(s+1, &readfds, NULL, NULL, &tv);
 			if(r) {
 				received = recv(s, (char*)&cmd+(sizeof(cmd)-left), left, 0);
-				if(received == SOCKET_ERROR){
-                    perror("comm recv socket error");
-					sighandler(0);
-					dead[1]=1;
-					pthread_exit(NULL);
-				} else if(do_exit){
-					printf("do exit\n");
-					dead[1]=1;
-					pthread_exit(NULL);
-				} else {
-					left -= received;
-				}
-			} else if(do_exit) {
+				left -= received;
+			}
+			if(received == SOCKET_ERROR || do_exit) {
 				printf("comm recv bye\n");
 				sighandler(0);
-				dead[1] = 1;
 				pthread_exit(NULL);
 			}
 		}
@@ -393,9 +369,11 @@ int main(int argc, char **argv)
 	int port = 1234;
 	uint32_t frequency = 100000000, samp_rate = 2048000;
 	struct sockaddr_in local, remote;
-	int device_count;
-	uint32_t dev_index = 0, buf_num = 0;
+	uint32_t buf_num = 0;
+	int dev_index = 0;
+	int dev_given = 0;
 	int gain = 0;
+	int ppm_error = 0;
 	struct llist *curelem,*prev;
 	pthread_attr_t attr;
 	void *status;
@@ -413,19 +391,20 @@ int main(int argc, char **argv)
 	struct sigaction sigact, sigign;
 #endif
 
-	while ((opt = getopt(argc, argv, "a:p:f:g:s:b:n:d:")) != -1) {
+	while ((opt = getopt(argc, argv, "a:p:f:g:s:b:n:d:P:")) != -1) {
 		switch (opt) {
 		case 'd':
-			dev_index = atoi(optarg);
+			dev_index = verbose_device_search(optarg);
+			dev_given = 1;
 			break;
 		case 'f':
-			frequency = (uint32_t)atof(optarg);
+			frequency = (uint32_t)atofs(optarg);
 			break;
 		case 'g':
 			gain = (int)(atof(optarg) * 10); /* tenths of a dB */
 			break;
 		case 's':
-			samp_rate = (uint32_t)atof(optarg);
+			samp_rate = (uint32_t)atofs(optarg);
 			break;
 		case 'a':
 			addr = optarg;
@@ -439,6 +418,9 @@ int main(int argc, char **argv)
 		case 'n':
 			llbuf_num = atoi(optarg);
 			break;
+		case 'P':
+			ppm_error = atoi(optarg);
+			break;
 		default:
 			usage();
 			break;
@@ -448,21 +430,20 @@ int main(int argc, char **argv)
 	if (argc < optind)
 		usage();
 
-	device_count = rtlsdr_get_device_count();
-	if (!device_count) {
-		fprintf(stderr, "No supported devices found.\n");
-		exit(1);
+	if (!dev_given) {
+		dev_index = verbose_device_search("0");
 	}
 
-	printf("Found %d device(s).\n", device_count);
+	if (dev_index < 0) {
+	    exit(1);
+	}
 
-	rtlsdr_open(&dev, dev_index);
+	rtlsdr_open(&dev, (uint32_t)dev_index);
 	if (NULL == dev) {
 	fprintf(stderr, "Failed to open rtlsdr device #%d.\n", dev_index);
 		exit(1);
 	}
 
-	printf("Using %s\n", rtlsdr_get_device_name(dev_index));
 #ifndef _WIN32
 	sigact.sa_handler = sighandler;
 	sigemptyset(&sigact.sa_mask);
@@ -475,6 +456,10 @@ int main(int argc, char **argv)
 #else
 	SetConsoleCtrlHandler( (PHANDLER_ROUTINE) sighandler, TRUE );
 #endif
+
+	/* Set the tuner error */
+	verbose_ppm_set(dev, ppm_error);
+
 	/* Set the sample rate */
 	r = rtlsdr_set_sample_rate(dev, samp_rate);
 	if (r < 0)
@@ -528,12 +513,12 @@ int main(int argc, char **argv)
 	setsockopt(listensocket, SOL_SOCKET, SO_LINGER, (char *)&ling, sizeof(ling));
 	bind(listensocket,(struct sockaddr *)&local,sizeof(local));
 
-	#ifdef _WIN32
+#ifdef _WIN32
 	ioctlsocket(listensocket, FIONBIO, &blockmode);
-	#else
+#else
 	r = fcntl(listensocket, F_GETFL, 0);
 	r = fcntl(listensocket, F_SETFL, r | O_NONBLOCK);
-	#endif
+#endif
 
 	while(1) {
 		printf("listening...\n");
@@ -586,13 +571,8 @@ int main(int argc, char **argv)
 
 		r = rtlsdr_read_async(dev, rtlsdr_callback, NULL, buf_num, 0);
 
-		if(!dead[0])
-			pthread_join(tcp_worker_thread, &status);
-		dead[0]=0;
-
-		if(!dead[1])
-			pthread_join(command_thread, &status);
-		dead[1]=0;
+		pthread_join(tcp_worker_thread, &status);
+		pthread_join(command_thread, &status);
 
 		closesocket(s);
 
@@ -615,9 +595,9 @@ out:
 	rtlsdr_close(dev);
 	closesocket(listensocket);
 	closesocket(s);
-	#ifdef _WIN32
+#ifdef _WIN32
 	WSACleanup();
-	#endif
+#endif
 	printf("bye!\n");
 	return r >= 0 ? r : -r;
 }
