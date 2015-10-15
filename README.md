@@ -21,7 +21,7 @@ python script **udpclient.py** for easy operation included.
 * squelch (./udpclient.py squelch 0)
   * 0 = OFF
   * n = Value
-* gain (./udpclient.py agc auto)
+* gain (./udpclient.py gain auto)
   * auto = Automatic
   * n = Gainvalue; 195 = 19.5db
 * agc (./udpclient.py agc 1)
